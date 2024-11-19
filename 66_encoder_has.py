@@ -67,4 +67,4 @@ for file_index, file in enumerate(files):
 
     print(f"Time Slice {file_index + 1}: Encoded data saved to {output_file_path}")
 
-print("All time slices have been saved.")
+print("All slices have been saved.")
