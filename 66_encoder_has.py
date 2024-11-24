@@ -68,3 +68,8 @@ for file_index, file in enumerate(files):
     print(f"Time Slice {file_index + 1}: Encoded data saved to {output_file_path}")
 
 print("All slices have been saved.")
+
+# 如何编码使得信息量不衰减——————>数学证明
+# RNN
+# 数学上的，时间/空间复杂度低的方案
+# 信息论，群论
