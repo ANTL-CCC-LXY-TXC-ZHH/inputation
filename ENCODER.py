@@ -132,12 +132,12 @@ def finite_field_encoder_with_lagrange_projection(data_tensor, alpha=0.3, beta=0
     # 返回压缩后的所有时刻的向量，形状为 (num_times, num_nodes, compression_dim * 2)
     return np.array(compressed_vectors)
 
-folder_path = 'All_origin_data\All_origin_data'  # 这里替换成你存放Excel文件的文件夹路径
-num_files = 100
-data_tensor = load_matrices_from_excel(folder_path, num_files)
-compressed_vectors = finite_field_encoder_with_lagrange_projection(data_tensor)
+# folder_path = 'All_origin_data\All_origin_data'  # 这里替换成你存放Excel文件的文件夹路径
+# num_files = 100
+# data_tensor = load_matrices_from_excel(folder_path, num_files)
+# compressed_vectors = finite_field_encoder_with_lagrange_projection(data_tensor)
 
 # 打印压缩后向量的形状，验证
-print("压缩后的向量形状:", compressed_vectors.shape)
+# print("压缩后的向量形状:", compressed_vectors.shape)
 # print(compressed_vectors[:,:])
 
