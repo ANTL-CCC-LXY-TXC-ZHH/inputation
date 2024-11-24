@@ -70,7 +70,7 @@ def lagrange_interpolation(x_values, y_values, p):
     
     return result
 
-def finite_field_encoder_with_lagrange_projection(data_tensor, p=101, compression_dim=10):
+def finite_field_encoder_with_lagrange_projection(data_tensor, alpha=0.3, beta=0.7, p=101, compression_dim=10):
     """
     使用拉格朗日插值法生成压缩矩阵，并将每个节点的流量向量压缩到低维空间。
     
@@ -102,8 +102,8 @@ def finite_field_encoder_with_lagrange_projection(data_tensor, p=101, compressio
 
     for t in range(num_times):
         matrix = data_tensor[t]
+        compressed_vector_last = [0]*2*compression_dim
         compressed_vectors_at_time_t = []
-        
         for i in range(num_nodes):
             # 节点 i 的输出流量（第 i 行）
             output_flow = matrix[i, :]
@@ -122,9 +122,11 @@ def finite_field_encoder_with_lagrange_projection(data_tensor, p=101, compressio
             # 将压缩后的输入输出流量拼接
             compressed_vector = np.concatenate([compressed_input, compressed_output])
             
+            for i in range(len(compressed_vector)):
+                compressed_vector[i] = alpha * compressed_vector_last[i] + beta * compressed_vector[i]
+
+            compressed_vector_last = compressed_vector
             compressed_vectors_at_time_t.append(compressed_vector)
-        
-        # 将当前时刻所有节点的压缩向量保存到最终的结果中
         compressed_vectors.append(compressed_vectors_at_time_t)
     
     # 返回压缩后的所有时刻的向量，形状为 (num_times, num_nodes, compression_dim * 2)
@@ -137,5 +139,5 @@ compressed_vectors = finite_field_encoder_with_lagrange_projection(data_tensor)
 
 # 打印压缩后向量的形状，验证
 print("压缩后的向量形状:", compressed_vectors.shape)
-print(compressed_vectors[0,:,:])
+# print(compressed_vectors[:,:])
 
