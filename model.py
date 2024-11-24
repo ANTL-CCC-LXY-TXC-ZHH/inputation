@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
-import numpy as np
 
 # 定义4层全连接神经网络
 class FCNN(nn.Module):
@@ -79,8 +78,8 @@ def test(model, val_loader, criterion):
     with torch.no_grad():
         for inputs, targets in val_loader:
             outputs = model(inputs)
-            plot_traffic_matrix(outputs)
-            print("output size: ", outputs.size())
+            # plot_traffic_matrix(outputs)
+            # print("output size: ", outputs.size())
             loss = criterion(outputs, targets)
             val_loss += loss.item()
     

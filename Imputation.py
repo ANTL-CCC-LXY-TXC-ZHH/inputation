@@ -1,4 +1,4 @@
-from  ENCODER import load_matrices_from_excel, finite_field_encoder_with_lagrange_projection
+from  encoder import load_matrices_from_excel, finite_field_encoder_with_lagrange_projection
 import numpy as np
 import torch
 import torch.nn as nn
