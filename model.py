@@ -1,6 +1,26 @@
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
+from torch_geometric.nn import GCNConv
+
+class GCN(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(GCN, self).__init__()
+        self.conv1 = GCNConv(input_dim, 128)  # 增加隐藏层大小到 256
+        self.conv3 = GCNConv(128, output_dim)
+        self.relu = nn.ReLU()
+
+    def forward(self, x, edge_index):
+        x = self.conv1(x, edge_index)
+        x = self.relu(x)
+        x = self.dropout(x)
+        
+        x = self.conv2(x, edge_index)
+        x = self.relu(x)
+        x = self.dropout(x)
+        
+        x = self.conv3(x, edge_index)
+        return x
 
 # 定义4层全连接神经网络
 class FCNN(nn.Module):
@@ -78,7 +98,7 @@ def test(model, val_loader, criterion):
     with torch.no_grad():
         for inputs, targets in val_loader:
             outputs = model(inputs)
-            # plot_traffic_matrix(outputs)
+            plot_traffic_matrix(outputs)
             # print("output size: ", outputs.size())
             loss = criterion(outputs, targets)
             val_loss += loss.item()
