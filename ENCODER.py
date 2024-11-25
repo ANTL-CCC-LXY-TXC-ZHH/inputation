@@ -70,7 +70,7 @@ def lagrange_interpolation(x_values, y_values, p):
     
     return result
 
-def finite_field_encoder_with_lagrange_projection(data_tensor, alpha=0.3, beta=0.7, p=101, compression_dim=10):
+def finite_field_encoder_with_lagrange_projection(data_tensor, alpha=0.1, beta=0.9, p=101, compression_dim=10):
     """
     使用拉格朗日插值法生成压缩矩阵，并将每个节点的流量向量压缩到低维空间。
     

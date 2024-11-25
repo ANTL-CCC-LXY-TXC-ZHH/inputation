@@ -2,17 +2,11 @@ import torch
 import torch.nn as nn
 from torch_geometric.nn import GCNConv
 import matplotlib.pyplot as plt
-
+from sklearn.metrics import mean_absolute_error
 # 设备选择
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
-def mae(y_true, y_pred):
-    return torch.mean(torch.abs(y_true - y_pred))
-
-# 计算均方根误差 (RMSE)
-def rmse(y_true, y_pred):
-    return torch.sqrt(torch.mean((y_true - y_pred) ** 2))
 
 class FCNN(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, layer_num):
@@ -49,16 +43,16 @@ class FCNN(nn.Module):
 class GCN(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(GCN, self).__init__()
-        self.conv1 = GCNConv(input_dim, 512)
-        # self.conv2 = GCNConv(256, 256)
-        self.conv2 = GCNConv(512, output_dim)
+        self.conv1 = GCNConv(input_dim, 256)
+        self.conv2 = GCNConv(256, 256)
+        self.conv3 = GCNConv(256, output_dim)
         self.relu = nn.ReLU()
 
     def forward(self, x, edge_index):
         x = self.relu(self.conv1(x, edge_index))
-        # x = self.relu(self.conv2(x, edge_index))
+        x = self.relu(self.conv2(x, edge_index))
         # x = self.relu(self.conv3(x, edge_index))
-        x = self.conv2(x, edge_index)
+        x = self.conv3(x, edge_index)
         return x
 
 def plot_traffic_matrix(traffic_matrix, title="Traffic Matrix"):
@@ -85,7 +79,7 @@ def train_FCN(model, train_loader, criterion, optimizer, scheduler, num_epochs=5
             # 前向传播
             outputs = model(inputs)
             # 计算损失
-            mae_value = mae(outputs, targets)
+            mae_value = mean_absolute_error(outputs, targets)
             # rmse_value = rmse(outputs, targets)
             loss = criterion(outputs, targets)
             
@@ -112,9 +106,8 @@ def test_FCN(model, val_loader, criterion, device=device):
             outputs = model(inputs)
             out_cpu = outputs.cpu()
             plot_traffic_matrix(out_cpu)
-            mae_value = mae(outputs, targets)
-            rmse_value = rmse(outputs, targets)
-            print("MAE: ", mae_value, "RMSE: ", rmse_value)
+            mae_value = mean_absolute_error(outputs, targets)
+            print("MAE: ", mae_value)
             loss = criterion(outputs, targets)
             val_loss += loss.item()
     
@@ -159,15 +152,16 @@ def test_GCN(model, val_loader, criterion, edge_index, device=device):
         for inputs, targets in val_loader:
             inputs, targets = inputs.to(device), targets.to(device)  # 将数据移到设备
             edge = edge_index[count].to(device)
-            outputs = model(inputs, edge)
-            output_cpu = outputs.cpu()
-            output_cpu = output_cpu.squeeze(0)
-            plot_traffic_matrix(output_cpu)
+            outputs = model(inputs, edge)       
+            output_cpu = outputs[0, : ,:].cpu()
+            target_cpu = targets[0, : ,:].cpu()
+            MAE = mean_absolute_error(output_cpu, target_cpu)
+            # output_cpu = output_cpu.squeeze(0)
+            # plot_traffic_matrix(output_cpu)
             loss = criterion(outputs, targets)
             val_loss += loss.item()
             count += 1
-    
-    print(f'Validation Loss: {val_loss/len(val_loader):.4f}')
+    print(f'Validation Loss: {val_loss/len(val_loader):.4f}, MAE: {MAE:.4f}')
     return val_loss / len(val_loader)
 
 # 保存模型
