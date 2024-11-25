@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 from model import FCNN, GCN, train_GCN, test_GCN, train_FCN, test_FCN, save_model
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from helper import getModelSize
 # 设置随机种子以确保结果可复现
 np.random.seed(3407)
 torch.manual_seed(3407)
@@ -102,6 +103,7 @@ scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.1, patience = 30, verbo
 if mode == 1:
     # 训练模式
     print("进入训练模式...")
+    getModelSize(model)
     #train_FCN(model, train_loader, criterion, optimizer, scheduler, num_epochs=100, device=device)
     train_GCN(model, train_loader, criterion, optimizer, scheduler, edge_indices, num_epochs=500, device=device)
     # 保存训练好的模型
