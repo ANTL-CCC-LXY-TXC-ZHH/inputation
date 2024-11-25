@@ -3,37 +3,56 @@ import torch.nn as nn
 from torch_geometric.nn import GCNConv
 import matplotlib.pyplot as plt
 
-class FCNN(nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super(FCNN, self).__init__()
-        self.fc1 = nn.Linear(input_dim, 512)
-        self.fc2 = nn.Linear(512, 256)
-        self.fc3 = nn.Linear(256, 128)
-        self.fc4 = nn.Linear(128, output_dim)
-        self.relu = nn.ReLU()
-        self.output_activation = nn.Sigmoid()  # 如果数据是0-1范围内，可以使用 Sigmoid 作为输出激活函数
+# 设备选择
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"Using device: {device}")
 
+def mae(y_true, y_pred):
+    return torch.mean(torch.abs(y_true - y_pred))
+
+# 计算均方根误差 (RMSE)
+def rmse(y_true, y_pred):
+    return torch.sqrt(torch.mean((y_true - y_pred) ** 2))
+
+class FCNN(nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim, layer_num):
+        """Initialize the FaultNetWork with the network structure.
+
+        Args:
+            input_dim: dimension of input data, history len * flattened traffic matrix
+            output_dim: dimension of output data, len of candidate paths all s-d pairs
+            layer_num: number of hidden layers
+        """
+        super(FCNN, self).__init__()
+        self.flatten = nn.Flatten()
+        self.layers = []
+        self.layers.append(nn.Linear(input_dim, hidden_dim))
+        self.layers.append(nn.ReLU())
+        for _ in range(layer_num):
+            self.layers.append(nn.Linear(hidden_dim, hidden_dim))
+            self.layers.append(nn.ReLU())
+        self.layers.append(nn.Linear(hidden_dim, output_dim))
+        self.layers.append(nn.Sigmoid())
+        self.net = nn.Sequential(*self.layers)
+    
     def forward(self, x):
+        """Forward the input data through the network.
+
+        Args:
+            x: input data, history len * flattened traffic matrix
+        """
         x = x.squeeze(0)
-        # print("Init size: ", x.size())
-        x = self.relu(self.fc1(x))
-        # print("1 size: ", x.size())
-        x = self.relu(self.fc2(x))
-        # print("2 size: ", x.size())
-        x = self.relu(self.fc3(x))
-        # print("3 size: ", x.size())
-        x = self.fc4(x)  # 输出层不再使用激活函数
-        # print("Out size: ", x.size())
-        return x
+        logits = self.net(x)
+        return logits
 
 # 4层GCN
 class GCN(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(GCN, self).__init__()
-        self.conv1 = GCNConv(input_dim, 512)
-        self.conv2 = GCNConv(512, 256)
-        self.conv3 = GCNConv(256, 128)
-        self.conv4 = GCNConv(128, output_dim)
+        self.conv1 = GCNConv(input_dim, 256)
+        self.conv2 = GCNConv(256, 128)
+        self.conv3 = GCNConv(128, 64)
+        self.conv4 = GCNConv(64, output_dim)
         self.relu = nn.ReLU()
 
     def forward(self, x, edge_index):
@@ -44,12 +63,7 @@ class GCN(nn.Module):
         return x
 
 def plot_traffic_matrix(traffic_matrix, title="Traffic Matrix"):
-    """绘制流量矩阵的热图。
-
-    Args:
-        traffic_matrix: 流量矩阵，形状为(num_nodes, num_nodes)
-        title: 热图的标题
-    """
+    """绘制流量矩阵的热图。"""
     plt.figure(figsize=(10, 8))
     plt.imshow(traffic_matrix, cmap='hot', interpolation='nearest')
     plt.colorbar(label='Traffic Intensity')
@@ -60,37 +74,48 @@ def plot_traffic_matrix(traffic_matrix, title="Traffic Matrix"):
     plt.show()
 
 # 训练函数
-def train_FCN(model, train_loader, criterion, optimizer, num_epochs=50):
+def train_FCN(model, train_loader, criterion, optimizer, scheduler, num_epochs=50, device=device):
+    model.to(device)  # 将模型移到设备
     model.train()
     for epoch in range(num_epochs):
         running_loss = 0.0
         for data in train_loader:
             inputs, targets = data  # 从DataLoader中获取输入和标签
+            inputs, targets = inputs.to(device), targets.to(device)  # 将数据移到设备
             optimizer.zero_grad()  # 清零梯度
             # 前向传播
             outputs = model(inputs)
             # 计算损失
+            mae_value = mae(outputs, targets)
+            # rmse_value = rmse(outputs, targets)
             loss = criterion(outputs, targets)
+            
             # 反向传播
             loss.backward()
             # 更新参数
             optimizer.step()
             running_loss += loss.item()
-
+            
+        scheduler.step(running_loss/len(train_loader))
         # 打印每个 epoch 的训练损失
-        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(train_loader):.4f}')
+        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(train_loader):.4f}, MAE:{mae_value:.2f}')
     
     print("Training finished.")
 
 # 测试函数
-def test_FCN(model, val_loader, criterion):
+def test_FCN(model, val_loader, criterion, device=device):
+    model.to(device)  # 将模型移到设备
     model.eval()
     val_loss = 0.0
     with torch.no_grad():
         for inputs, targets in val_loader:
+            inputs, targets = inputs.to(device), targets.to(device)  # 将数据移到设备
             outputs = model(inputs)
-            # plot_traffic_matrix(output)
-            # print("output size: ", outputs.size())
+            out_cpu = outputs.cpu()
+            plot_traffic_matrix(out_cpu)
+            mae_value = mae(outputs, targets)
+            rmse_value = rmse(outputs, targets)
+            print("MAE: ", mae_value, "RMSE: ", rmse_value)
             loss = criterion(outputs, targets)
             val_loss += loss.item()
     
@@ -98,12 +123,15 @@ def test_FCN(model, val_loader, criterion):
     return val_loss / len(val_loader)
 
 # 训练函数
-def train_GCN(model, train_loader, criterion, optimizer, edge_index, num_epochs=50):
+def train_GCN(model, train_loader, criterion, optimizer,scheduler, edge_index, num_epochs, device=device):
+    model.to(device)  # 将模型移到设备
     model.train()
     for epoch in range(num_epochs):
         running_loss = 0.0
         for data in train_loader:
             inputs, targets = data  # 从DataLoader中获取输入和标签
+            inputs, targets = inputs.to(device), targets.to(device)  # 将数据移到设备
+            edge_index = edge_index.to(device)
             optimizer.zero_grad()  # 清零梯度
             # 前向传播
             outputs = model(inputs, edge_index)
@@ -114,21 +142,23 @@ def train_GCN(model, train_loader, criterion, optimizer, edge_index, num_epochs=
             # 更新参数
             optimizer.step()
             running_loss += loss.item()
-
+        scheduler.step(running_loss/len(train_loader))
         # 打印每个 epoch 的训练损失
         print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(train_loader):.4f}')
     
     print("Training finished.")
 
 # 测试函数
-def test_GCN(model, val_loader, criterion, edge_index):
+def test_GCN(model, val_loader, criterion, edge_index, device=device):
+    model.to(device)  # 将模型移到设备
     model.eval()
     val_loss = 0.0
     with torch.no_grad():
         for inputs, targets in val_loader:
+            inputs, targets = inputs.to(device), targets.to(device)  # 将数据移到设备
+            edge_index = edge_index.to(device)
             outputs = model(inputs, edge_index)
             plot_traffic_matrix(outputs)
-            # print("output size: ", outputs.size())
             loss = criterion(outputs, targets)
             val_loss += loss.item()
     
