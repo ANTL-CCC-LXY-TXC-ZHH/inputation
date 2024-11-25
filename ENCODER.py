@@ -2,16 +2,16 @@ import pandas as pd
 import numpy as np
 import os
 
-def load_matrices_from_excel(folder_path, num_files):
+def load_matrices_from_excel(folder_path, num_files, num_nodes):
     """
-    从指定文件夹中加载多个Excel文件，提取每个文件中的66x66矩阵，最终拼接成一个三维张量。
+    从指定文件夹中加载多个Excel文件，提取每个文件中的num_nodes x num_nodes矩阵，最终拼接成一个三维张量。
     
     参数：
         folder_path (str): 包含Excel文件的文件夹路径
         num_files (int): 文件夹中Excel文件的数量
     
     返回：
-        np.ndarray: 一个三维张量，形状为 (num_files, 66, 66)
+        np.ndarray: 一个三维张量，形状为 (num_files, num_nodes, num_nodes)
     """
     matrices = []
     
@@ -24,11 +24,11 @@ def load_matrices_from_excel(folder_path, num_files):
             df = pd.read_excel(file_path, header=None)  # 假设文件没有列名和索引
             matrix = df.to_numpy()  # 转换为NumPy数组
             
-            if matrix.shape == (66, 66):
+            if matrix.shape == (num_nodes, num_nodes):
                 matrices.append(matrix)
                 print("Read done: ",i)
             else:
-                print(f"警告: 文件 {file_path} 不是66x66矩阵，跳过该文件。")
+                print(f"警告: 文件 {file_path} 不是矩阵，跳过该文件。")
         except Exception as e:
             print(f"错误: 读取文件 {file_path} 时发生异常: {e}")
     

@@ -43,9 +43,9 @@ class FCNN(nn.Module):
 class GCN(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(GCN, self).__init__()
-        self.conv1 = GCNConv(input_dim, 256)
-        self.conv2 = GCNConv(256, 256)
-        self.conv3 = GCNConv(256, output_dim)
+        self.conv1 = GCNConv(input_dim, 512)
+        self.conv2 = GCNConv(512, 512)
+        self.conv3 = GCNConv(512, output_dim)
         self.relu = nn.ReLU()
 
     def forward(self, x, edge_index):
@@ -53,7 +53,9 @@ class GCN(nn.Module):
         x = self.relu(self.conv2(x, edge_index))
         # x = self.relu(self.conv3(x, edge_index))
         x = self.conv3(x, edge_index)
+
         return x
+
 
 def plot_traffic_matrix(traffic_matrix, title="Traffic Matrix"):
     """绘制流量矩阵的热图。"""
@@ -82,7 +84,6 @@ def train_FCN(model, train_loader, criterion, optimizer, scheduler, num_epochs=5
             mae_value = mean_absolute_error(outputs, targets)
             # rmse_value = rmse(outputs, targets)
             loss = criterion(outputs, targets)
-            
             # 反向传播
             loss.backward()
             # 更新参数
@@ -130,14 +131,24 @@ def train_GCN(model, train_loader, criterion, optimizer,scheduler, edge_index, n
             outputs = model(inputs, edge)
             # 计算损失
             loss = criterion(outputs, targets)
+
             # 反向传播
             loss.backward()
             # 更新参数
             optimizer.step()
+            # for name, parms in model.named_parameters():	
+            #     print('-->name:', name)
+            #     print('-->grad_requirs:',parms.requires_grad)
+            #     print('-->grad_value:',parms.grad)
+            #     print("===")
             running_loss += loss.item()
             count += 1
         scheduler.step(running_loss/len(train_loader))
         # 打印每个 epoch 的训练损失
+        # if(epoch%10 == 0):
+        #     output_cpu = outputs[0, : ,:].cpu()
+        #     output = output_cpu.detach().numpy()
+        #     plot_traffic_matrix(output)
         print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(train_loader):.4f}')
     
     print("Training finished.")

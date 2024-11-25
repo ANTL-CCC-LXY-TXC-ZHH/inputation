@@ -16,15 +16,17 @@ torch.manual_seed(3407)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
-folder_path = 'All_origin_data\\All_origin_data'
+#folder_path = 'All_origin_data\\All_origin_data'
+
+folder_path = 'All_origin_data\\TELESAT'
 T = 1000  # 时间步长
-num_nodes = 66  # 节点数
-origin_data_tensor = load_matrices_from_excel(folder_path, T)  # 流量矩阵
+num_nodes = 298  # 节点数
+origin_data_tensor = load_matrices_from_excel(folder_path, T, num_nodes)  # 流量矩阵
 
 # 拉格朗日压缩
-compressed_vectors = finite_field_encoder_with_lagrange_projection(origin_data_tensor, alpha=0.3, beta=0.7, p=101, compression_dim=12)  # 每个卫星上进行压缩后，合并的特征矩阵
+compressed_vectors = finite_field_encoder_with_lagrange_projection(origin_data_tensor, alpha=0.3, beta=0.7, p=101, compression_dim=24)  # 每个卫星上进行压缩后，合并的特征矩阵
 
-compression_dim = 12 * 2  # 压缩后的维度
+compression_dim = 24 * 2  # 压缩后的维度
 sample_size = 6  # 每个时间点随机采样的卫星数量（这里可以调整）
 
 # 假设 compressed_vectors 是原始数据
@@ -46,13 +48,18 @@ for t in range(T):
         if node in current_group:
             mask[t, node, :] = 1  # 当前组的卫星特征保留
         else:
-            mask[t, node, :] = 0  # 其他卫星特征置为 0
+            mask[t, node, :] = 1e-8 # 其他卫星特征置为 0
 
+for t in range(T):
+    for i in range(num_nodes):
+        for j in range(compression_dim):
+            if(origin_data_tensor[t,i,j] == 0):
+                origin_data_tensor[t,i,j] = 1e-8
 # 对应的 features_with_mask 数据
 features_with_mask = compressed_vectors * mask  # 只保留被采样的卫星的数据，其余为 0
 
 def create_edge_index_from_traffic(traffic_matrix):
-    edge_index = torch.nonzero(traffic_matrix > 0, as_tuple=False).t()  # 查找所有非零流量的索引
+    edge_index = torch.nonzero(traffic_matrix > 1e-6, as_tuple=False).t()  # 查找所有非零流量的索引
     return edge_index
 
 # 计算动态边索引
@@ -94,12 +101,15 @@ mode = 1  # 设置为 1 进行训练，设置为 2 进行测试
 
 # 初始化模型并将其转移到 GPU/CPU
 # model = FCNN(compression_dim, 512, num_nodes, 4).to(device)
+# model = GCN(compression_dim, num_nodes)
 model = GCN(compression_dim, num_nodes)
 # 定义损失函数与优化器
 criterion = nn.L1Loss()  # 使用均方误差损失函数
 optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4 )
+# optimizer = optim.SparseAdam(model.parameters(), lr=1e-3,betas=(0.9,0.999),eps=1e-8)
 scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.1, patience = 30, verbose=True, cooldown=10)
 # 训练或测试模式选择
+
 if mode == 1:
     # 训练模式
     print("进入训练模式...")
@@ -114,7 +124,7 @@ elif mode == 2:
     print("进入测试模式...")
     # 加载已经训练好的模型
     model.load_state_dict(torch.load('traffic_model.pth'))
-
+    getModelSize(model)
     # 在验证集上评估模型
     # test_FCN(model, val_loader, criterion, device=device)
     test_GCN(model, val_loader, criterion, edge_indices, device=device)
