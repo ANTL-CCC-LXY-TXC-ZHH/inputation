@@ -46,6 +46,17 @@ for t in range(T):
 # 对应的 features_with_mask 数据
 features_with_mask = compressed_vectors * mask  # 只保留被采样的卫星的数据，其余为 0
 
+def create_edge_index_from_traffic(traffic_matrix):
+    edge_index = torch.nonzero(traffic_matrix > 0, as_tuple=False).t()  # 查找所有非零流量的索引
+    return edge_index
+
+# 计算动态边索引
+edge_indices = []
+for t in range(T):
+    traffic_matrix = origin_data_tensor[t]  # 获取每个时间步的流量矩阵
+    edge_index = create_edge_index_from_traffic(torch.tensor(traffic_matrix, dtype=torch.float32))
+    edge_indices.append(edge_index)
+
 # 输出查看部分掩码
 print(mask.shape)  # 形状应为 (T, num_nodes, compression_dim)
 print(mask[0, :, :])  # 打印第一个时间点的掩码情况
@@ -74,7 +85,7 @@ val_data = TensorDataset(X_val, y_val)
 val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False)
 
 # 模式选择：1表示训练模式，2表示测试模式
-mode = 1  # 设置为 1 进行训练，设置为 2 进行测试
+mode = 2  # 设置为 1 进行训练，设置为 2 进行测试
 
 # 初始化模型并将其转移到 GPU/CPU
 #model = FCNN(compression_dim, 512, num_nodes, 4).to(device)
@@ -85,14 +96,14 @@ edge_index = torch.cat([edge_index, edge_index.flip(0)], dim=1)  # 对称连接
 print("///",edge_index.size())
 # 定义损失函数与优化器
 criterion = nn.L1Loss()  # 使用均方误差损失函数
-optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4 )
+optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5 )
 scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.3, patience = 10, verbose=True, cooldown=10)
 # 训练或测试模式选择
 if mode == 1:
     # 训练模式
     print("进入训练模式...")
     #train_FCN(model, train_loader, criterion, optimizer, scheduler, num_epochs=100, device=device)
-    train_GCN(model, train_loader, criterion, optimizer, scheduler, edge_index,num_epochs=100, device=device)
+    train_GCN(model, train_loader, criterion, optimizer, scheduler, edge_indices, num_epochs=500, device=device)
     # 保存训练好的模型
     save_model(model, 'traffic_model.pth')
 
@@ -104,7 +115,7 @@ elif mode == 2:
 
     # 在验证集上评估模型
     # test_FCN(model, val_loader, criterion, device=device)
-    test_GCN(model, val_loader, criterion, device=device)
+    test_GCN(model, val_loader, criterion, edge_indices, device=device)
 
 else:
     print("无效的模式选择，请选择 1 (训练模式) 或 2 (测试模式)！")

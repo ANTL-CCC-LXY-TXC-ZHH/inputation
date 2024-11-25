@@ -49,17 +49,16 @@ class FCNN(nn.Module):
 class GCN(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(GCN, self).__init__()
-        self.conv1 = GCNConv(input_dim, 256)
-        self.conv2 = GCNConv(256, 128)
-        self.conv3 = GCNConv(128, 64)
-        self.conv4 = GCNConv(64, output_dim)
+        self.conv1 = GCNConv(input_dim, 512)
+        # self.conv2 = GCNConv(256, 256)
+        self.conv2 = GCNConv(512, output_dim)
         self.relu = nn.ReLU()
 
     def forward(self, x, edge_index):
         x = self.relu(self.conv1(x, edge_index))
-        x = self.relu(self.conv2(x, edge_index))
-        x = self.relu(self.conv3(x, edge_index))
-        x = self.conv4(x, edge_index)
+        # x = self.relu(self.conv2(x, edge_index))
+        # x = self.relu(self.conv3(x, edge_index))
+        x = self.conv2(x, edge_index)
         return x
 
 def plot_traffic_matrix(traffic_matrix, title="Traffic Matrix"):
@@ -128,13 +127,14 @@ def train_GCN(model, train_loader, criterion, optimizer,scheduler, edge_index, n
     model.train()
     for epoch in range(num_epochs):
         running_loss = 0.0
+        count = 0
         for data in train_loader:
             inputs, targets = data  # 从DataLoader中获取输入和标签
             inputs, targets = inputs.to(device), targets.to(device)  # 将数据移到设备
-            edge_index = edge_index.to(device)
+            edge = edge_index[count].to(device)
             optimizer.zero_grad()  # 清零梯度
             # 前向传播
-            outputs = model(inputs, edge_index)
+            outputs = model(inputs, edge)
             # 计算损失
             loss = criterion(outputs, targets)
             # 反向传播
@@ -142,6 +142,7 @@ def train_GCN(model, train_loader, criterion, optimizer,scheduler, edge_index, n
             # 更新参数
             optimizer.step()
             running_loss += loss.item()
+            count += 1
         scheduler.step(running_loss/len(train_loader))
         # 打印每个 epoch 的训练损失
         print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(train_loader):.4f}')
@@ -154,13 +155,17 @@ def test_GCN(model, val_loader, criterion, edge_index, device=device):
     model.eval()
     val_loss = 0.0
     with torch.no_grad():
+        count = 0
         for inputs, targets in val_loader:
             inputs, targets = inputs.to(device), targets.to(device)  # 将数据移到设备
-            edge_index = edge_index.to(device)
-            outputs = model(inputs, edge_index)
-            plot_traffic_matrix(outputs)
+            edge = edge_index[count].to(device)
+            outputs = model(inputs, edge)
+            output_cpu = outputs.cpu()
+            output_cpu = output_cpu.squeeze(0)
+            plot_traffic_matrix(output_cpu)
             loss = criterion(outputs, targets)
             val_loss += loss.item()
+            count += 1
     
     print(f'Validation Loss: {val_loss/len(val_loader):.4f}')
     return val_loss / len(val_loader)
